@@ -35,7 +35,10 @@ def build_mlp(
 
     with tf.variable_scope(scope):
         # YOUR_CODE_HERE
-        pass
+        hidden_layer = input_placeholder
+        for i in range(n_layers):
+            hidden_layer = tf.layers.dense(hidden_layer, size, activation)
+        return tf.layers.dense(hidden_layer, output_size, output_activation)
 
 def pathlength(path):
     return len(path["reward"])
