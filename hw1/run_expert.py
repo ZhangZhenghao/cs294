@@ -9,6 +9,7 @@ Example usage:
 Author of this script and included expert policies: Jonathan Ho (hoj@openai.com)
 """
 import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
@@ -79,6 +80,13 @@ class NeuralNetwork:
 class RecurrentNetwork:
 
     def __init__(self, time_step: int, obs_dim: int, hidden_units: int, action_dim: int):
+        """
+        Create a recurrent neural network (LSTM) with a single hidden layer.
+        :param time_step: the number of steps
+        :param obs_dim: the dimension of observations
+        :param hidden_units: the number of hidden units
+        :param action_dim: the dimension of actions
+        """
         # Placeholder
         self.sy_obs = tf.placeholder(tf.float32, [None, time_step, obs_dim])
         self.sy_act = tf.placeholder(tf.float32, [None, action_dim])
@@ -95,6 +103,15 @@ class RecurrentNetwork:
         self.sess.run(tf.global_variables_initializer())
 
     def fit(self, observations, actions, iter, batch_size=1000, print_iter=100):
+        """
+        Train the neural network.
+        :param observations: observations for training
+        :param actions: actions for training
+        :param iter: the number of training iterations
+        :param batch_size: the size of training batch
+        :param print_iter: when to print loss
+        :return: the history of loss
+        """
         train_size, _ = actions.shape
         loss_hist = []
         for i in range(iter):
@@ -122,11 +139,21 @@ class RecurrentNetwork:
 
 
 def stdout_write(text):
+    """
+    Print without newline.
+    :param text: the string to output
+    """
     sys.stdout.write(text)
     sys.stdout.flush()
 
 
 def look_ahead(observations, num_step):
+    """
+    Construct the input tensor for the recurrent neural network.
+    :param observations: the tensor of observations
+    :param num_step: the number of steps
+    :return: the tensor with a temporal dimension
+    """
     num_batch, num_dim = observations.shape
     tempo_obs = np.zeros([num_batch, num_step, num_dim])
     for t in range(num_step):
@@ -144,10 +171,13 @@ def main():
     parser.add_argument('--render', action='store_true')
     parser.add_argument("--max_timesteps", type=int)
     parser.add_argument('--num_rollouts', type=int, default=20, help='Number of expert roll outs')
-    parser.add_argument('--plot_loss', action='store_true')
+    parser.add_argument('--plot_loss', action='store_true', help='Plot loss history after training')
     parser.add_argument('--dagger', type=int, default=0, help='Epoch of DAgger training')
-    parser.add_argument('--tempo', type=int, default=0)
+    parser.add_argument('--tempo', type=int, default=0, help='Number of time steps for RNN')
+    parser.add_argument('--batch_size', type=int, default=1000)
+    parser.add_argument('--n_iter', type=int, default=10000)
     args = parser.parse_args()
+
     # Load expert policy
     print('loading and building expert policy')
     policy_fn = load_policy.load_policy(args.expert_policy_file)
@@ -156,12 +186,14 @@ def main():
     with tf.Session():
         tf_util.initialize()
 
+        # Create environment
         import gym
         env = gym.make(args.envname)
         max_steps = args.max_timesteps or env.spec.timestep_limit
 
         stdout_write('Expert data generating ')
 
+        # Generate expert data
         returns_expert = []
         observations = []
         actions = []
@@ -183,34 +215,42 @@ def main():
                 if steps >= max_steps:
                     break
             returns_expert.append(total_reward)
+
         print()
 
+        # Report expert data
         print('returns', returns_expert)
         print('mean return', np.mean(returns_expert))
         print('std of return', np.std(returns_expert))
 
+        # Prepare expert data
         observations = np.array(observations)
         actions = np.squeeze(actions)
-
         obs_dim = observations.shape[1]
         act_dim = actions.shape[1]
 
+        # Create neural network
         if args.tempo > 1:
             net = RecurrentNetwork(args.tempo, obs_dim, obs_dim, act_dim)
         else:
             net = NeuralNetwork(obs_dim, obs_dim, act_dim)
+
+        # Training
         returns_policy = []
         loss_hist = []
         for epoch in range(args.dagger+1):
             # Fit expert data
             if args.tempo > 1:
-                loss_hist += net.fit(look_ahead(observations, args.tempo), actions, 10000, print_iter=1000)
+                loss_hist += net.fit(look_ahead(observations, args.tempo), actions, args.n_iter, args.batch_size)
             else:
-                loss_hist += net.fit(observations, actions, 10000, print_iter=1000)
-            # Print epoch
-            stdout_write('Policy testing ' if epoch == args.dagger
-                         else 'DAgger data generating (epoch %d/%d)' % (epoch+1, args.dagger))
-            # Generate expert data
+                loss_hist += net.fit(observations, actions, args.n_iter, args.batch_size)
+
+            if epoch == args.dagger:
+                stdout_write('Policy testing ')
+            else:
+                stdout_write('DAgger data generating (epoch %d/%d)' % (epoch+1, args.dagger))
+
+            # Generate DAgger data
             for i in range(args.num_rollouts):
                 stdout_write('.')
                 obs = env.reset()
@@ -239,12 +279,13 @@ def main():
                         break
                 if epoch == args.dagger:
                     returns_policy.append(total_reward)
-            # Print new line
             print()
+
     # Print performance
     print('returns', returns_policy)
     print('mean return', np.mean(returns_policy))
     print('std of return', np.std(returns_policy))
+
     # Plot loss history
     if args.plot_loss:
         plt.plot(loss_hist)
