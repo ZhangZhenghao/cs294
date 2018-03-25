@@ -128,6 +128,13 @@ def learn(env,
     ######
     
     # YOUR CODE HERE
+    q = q_func(obs_t_float, num_actions, 'q_func', False)
+    target_q = q_func(obs_tp1_float, num_actions, 'target_q_func', False)
+    y = rew_t_ph + gamma * tf.reduce_max(target_q, 1) * (1 - done_mask_ph)
+    index = tf.stack([tf.range(tf.shape(q)[0]), act_t_ph], 1)
+    total_error = tf.losses.mean_squared_error(y, tf.gather_nd(q, index))
+    q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, 'q_func')
+    target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, 'target_q_func')
 
     ######
 
@@ -195,6 +202,17 @@ def learn(env,
         #####
         
         # YOUR CODE HERE
+        idx = replay_buffer.store_frame(last_obs)
+        if model_initialized and np.random.uniform() > exploration.value(t):
+            obs_context = replay_buffer.encode_recent_observation()
+            q = session.run(target_q, {obs_tp1_float: [obs_context]})
+            action = np.argmax(q, 1)
+        else:
+            action = np.random.randint(0, num_actions)
+        last_obs, reward, done, _ = env.step(action)
+        replay_buffer.store_effect(idx, action, reward, done)
+        if done:
+            last_obs = env.reset()
 
         #####
 
@@ -245,7 +263,28 @@ def learn(env,
             #####
             
             # YOUR CODE HERE
-
+            # Sample a batch of transitions
+            obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
+            # Global initialization
+            if not model_initialized:
+                model_initialized = True
+                initialize_interdependent_variables(session, tf.global_variables(), {
+                   obs_t_ph: obs_batch,
+                   obs_tp1_ph: next_obs_batch,
+                })
+            # Train the model
+            session.run(train_fn, {
+                obs_t_ph: obs_batch,
+                act_t_ph: act_batch,
+                rew_t_ph: rew_batch,
+                obs_tp1_ph: next_obs_batch,
+                done_mask_ph: done_mask,
+                learning_rate: optimizer_spec.lr_schedule.value(t)
+            })
+            # Update the target network
+            if t % target_update_freq == 0:
+                num_param_updates += 1
+                session.run(update_target_fn)
             #####
 
         ### 4. Log progress
