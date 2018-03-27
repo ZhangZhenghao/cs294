@@ -40,16 +40,16 @@ def compute_normalization(data):
     """ YOUR CODE HERE """
     # Compute normalization for observation
     obs = data['obs']
-    mean_obs = np.mean(obs)
-    std_obs = np.std(obs)
+    mean_obs = np.mean(obs, 0, keepdims=True)
+    std_obs = np.std(obs, 0, keepdims=True)
     # Compute normalization for deltas
     deltas = data['deltas']
-    mean_deltas = np.mean(deltas)
-    std_deltas = np.std(deltas)
+    mean_deltas = np.mean(deltas, 0, keepdims=True)
+    std_deltas = np.std(deltas, 0, keepdims=True)
     # Compute normalization for action
     action = data['action']
-    mean_action = np.mean(action)
-    std_action = np.std(action)
+    mean_action = np.mean(action, 0, keepdims=True)
+    std_action = np.std(action, 0, keepdims=True)
     return mean_obs, std_obs, mean_deltas, std_deltas, mean_action, std_action
 
 
