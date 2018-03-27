@@ -38,6 +38,18 @@ def compute_normalization(data):
     """
 
     """ YOUR CODE HERE """
+    # Compute normalization for observation
+    obs = data['obs']
+    mean_obs = np.mean(obs)
+    std_obs = np.std(obs)
+    # Compute normalization for deltas
+    deltas = data['deltas']
+    mean_deltas = np.mean(deltas)
+    std_deltas = np.std(deltas)
+    # Compute normalization for action
+    action = data['action']
+    mean_action = np.mean(action)
+    std_action = np.std(action)
     return mean_obs, std_obs, mean_deltas, std_deltas, mean_action, std_action
 
 
@@ -112,6 +124,21 @@ def train(env,
     random_controller = RandomController(env)
 
     """ YOUR CODE HERE """
+    data = {'obs': [], 'deltas': [], 'action': []}
+    for _ in range(num_paths_random):
+        obs = env.reset()
+        done = False
+        timestep = 0
+        while not done:
+            action = random_controller.get_action(obs)
+            next_obs, _, done, _ = env.step(action)
+            data['obs'].append(obs)
+            data['deltas'].append(next_obs - obs)
+            data['action'].append(action)
+            obs = next_obs
+            timestep += 1
+            if timestep > env_horizon:
+                break
 
 
     #========================================================
@@ -121,8 +148,9 @@ def train(env,
     # (where deltas are o_{t+1} - o_t). These will be used
     # for normalizing inputs and denormalizing outputs
     # from the dynamics network. 
-    # 
-    normalization = """ YOUR CODE HERE """
+    #
+    """ YOUR CODE HERE """
+    normalization = compute_normalization(data)
 
 
     #========================================================

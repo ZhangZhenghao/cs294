@@ -12,14 +12,15 @@ class Controller():
 
 
 class RandomController(Controller):
-	def __init__(self, env):
-		""" YOUR CODE HERE """
-		pass
+    def __init__(self, env):
+        """ YOUR CODE HERE """
+        super().__init__()
+        self.env = env
 
-	def get_action(self, state):
-		""" YOUR CODE HERE """
-		""" Your code should randomly sample an action uniformly from the action space """
-		pass
+    def get_action(self, state):
+        """ YOUR CODE HERE """
+        """ Your code should randomly sample an action uniformly from the action space """
+        return self.env.action_space.sample()
 
 
 class MPCcontroller(Controller):
