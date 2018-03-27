@@ -124,7 +124,7 @@ def train(env,
     random_controller = RandomController(env)
 
     """ YOUR CODE HERE """
-    data = {'obs': [], 'deltas': [], 'action': []}
+    observations, deltas, actions = [], [], []
     for _ in range(num_paths_random):
         obs = env.reset()
         done = False
@@ -132,13 +132,18 @@ def train(env,
         while not done:
             action = random_controller.get_action(obs)
             next_obs, _, done, _ = env.step(action)
-            data['obs'].append(obs)
-            data['deltas'].append(next_obs - obs)
-            data['action'].append(action)
+            observations.append(obs)
+            deltas.append(next_obs - obs)
+            actions.append(action)
             obs = next_obs
             timestep += 1
             if timestep > env_horizon:
                 break
+    data = {
+        'obs': np.asarray(observations),
+        'deltas': np.asarray(deltas),
+        'action': np.asarray(actions)
+    }
 
 
     #========================================================
